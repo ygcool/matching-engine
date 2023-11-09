@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/Pantelwar/binarytree"
-	"github.com/ericlagergren/decimal"
+	"github.com/Pantelwar/matching-engine/util"
 )
 
 // OrderBook type
@@ -28,8 +28,8 @@ type Book struct {
 }
 
 type orderinfo struct {
-	Price  *decimal.Big `json:"price"`
-	Amount *decimal.Big `json:"amount"`
+	Price  *util.StandardBigDecimal `json:"price"`
+	Amount *util.StandardBigDecimal `json:"amount"`
 }
 
 // MarshalJSON implements json.Marshaler interface
@@ -45,7 +45,7 @@ func (ob *OrderBook) MarshalJSON() ([]byte, error) {
 			// fmt.Println("    value", i)
 			var b orderinfo
 			// res := fmt.Sprintf("%#f -> ", i)
-			b.Price = new(decimal.Big).SetFloat64(i)
+			b.Price = util.NewDecimalFromFloat(i)
 			subNode := node.Data.(*OrderType).Tree.Root.SearchSubTree(i)
 			// fmt.Printf("subnode: %#v\n", subNode)
 			// fmt.Printf("volume:%#v, %#v\n\n", subNode.Data.(*OrderNode).Volume, len(subNode.Data.(*OrderNode).Orders))
@@ -67,7 +67,7 @@ func (ob *OrderBook) MarshalJSON() ([]byte, error) {
 			// fmt.Println("    value", i)
 			var b orderinfo
 			// res := fmt.Sprintf("%#f -> ", i)
-			b.Price = new(decimal.Big).SetFloat64(i)
+			b.Price = util.NewDecimalFromFloat(i)
 			subNode := node.Data.(*OrderType).Tree.Root.SearchSubTree(i)
 			// fmt.Printf("subnode: %#v\n", subNode)
 			// fmt.Printf("volume:%#v, %#v\n\n", subNode.Data.(*OrderNode).Volume, len(subNode.Data.(*OrderNode).Orders))
@@ -105,12 +105,15 @@ func (ob *OrderBook) GetOrders(limit int64) *BookArray {
 				return
 			}
 			var b []string
-			price := strconv.FormatFloat(i, 'f', -1, 64)
-			b = append(b, price)
 			subNode := node.Data.(*OrderType).Tree.Root.SearchSubTree(i)
-			amount := subNode.Data.(*OrderNode).Volume
-			b = append(b, amount.String())
-			buys = append(buys, b)
+			if subNode != nil {
+				price := strconv.FormatFloat(i, 'f', -1, 64)
+				b = append(b, price)
+
+				amount := subNode.Data.(*OrderNode).Volume
+				b = append(b, amount.String())
+				buys = append(buys, b)
+			}
 		})
 	})
 
@@ -122,12 +125,15 @@ func (ob *OrderBook) GetOrders(limit int64) *BookArray {
 				return
 			}
 			var b []string
-			price := strconv.FormatFloat(i, 'f', -1, 64)
-			b = append(b, price)
 			subNode := node.Data.(*OrderType).Tree.Root.SearchSubTree(i)
-			amount := subNode.Data.(*OrderNode).Volume
-			b = append(b, amount.String())
-			sells = append(sells, b)
+			if subNode != nil {
+				price := strconv.FormatFloat(i, 'f', -1, 64)
+				b = append(b, price)
+
+				amount := subNode.Data.(*OrderNode).Volume
+				b = append(b, amount.String())
+				sells = append(sells, b)
+			}
 		})
 	})
 
@@ -151,12 +157,14 @@ func (ob *OrderBook) String() string {
 			// fmt.Println("    value", i)
 			res := strconv.FormatFloat(i, 'f', -1, 64) + " -> "
 			subNode := node.Data.(*OrderType).Tree.Root.SearchSubTree(i)
-			// fmt.Printf("subnode: %#v\n", subNode)
-			// fmt.Printf("volume:%#v, %#v\n\n", subNode.Data.(*OrderNode).Volume, len(subNode.Data.(*OrderNode).Orders))
-			vol, _ := subNode.Data.(*OrderNode).Volume.Float64()
-			res += strconv.FormatFloat(vol, 'f', -1, 64) //subNode.Data.(*OrderNode).Volume.String() // strings.Trim(subNode.Data.(*OrderNode).Volume.String(), "0")
-			// fmt.Println("res", res)
-			orderSideSell = append(orderSideSell, res)
+			if subNode != nil {
+				// fmt.Printf("subnode: %#v\n", subNode)
+				// fmt.Printf("volume:%#v, %#v\n\n", subNode.Data.(*OrderNode).Volume, len(subNode.Data.(*OrderNode).Orders))
+				vol := subNode.Data.(*OrderNode).Volume.Float64()
+				res += strconv.FormatFloat(vol, 'f', -1, 64) //subNode.Data.(*OrderNode).Volume.String() // strings.Trim(subNode.Data.(*OrderNode).Volume.String(), "0")
+				// fmt.Println("res", res)
+				orderSideSell = append(orderSideSell, res)
+			}
 		})
 	})
 	// fmt.Println()
@@ -178,11 +186,13 @@ func (ob *OrderBook) String() string {
 			// fmt.Println("    value", i)
 			res := strconv.FormatFloat(i, 'f', -1, 64) + " -> "
 			subNode := node.Data.(*OrderType).Tree.Root.SearchSubTree(i)
-			// fmt.Printf("subnode: %#v\n", subNode)
-			vol, _ := subNode.Data.(*OrderNode).Volume.Float64()
-			res += strconv.FormatFloat(vol, 'f', -1, 64) //subNode.Data.(*OrderNode).Volume.String() // strings.Trim(subNode.Data.(*OrderNode).Volume.String(), "0")
-			// fmt.Println("res b", res)
-			orderSideBuy = append(orderSideBuy, res)
+			if subNode != nil {
+				// fmt.Printf("subnode: %#v\n", subNode)
+				vol := subNode.Data.(*OrderNode).Volume.Float64()
+				res += strconv.FormatFloat(vol, 'f', -1, 64) //subNode.Data.(*OrderNode).Volume.String() // strings.Trim(subNode.Data.(*OrderNode).Volume.String(), "0")
+				// fmt.Println("res b", res)
+				orderSideBuy = append(orderSideBuy, res)
+			}
 		})
 	})
 	// fmt.Println()
@@ -214,7 +224,7 @@ func NewOrderBook() *OrderBook {
 
 // addBuyOrder a buy order to the order book
 func (ob *OrderBook) addBuyOrder(order Order) {
-	orderPrice, _ := order.Price.Float64()
+	orderPrice := order.Price.Float64()
 	startPoint := float64(int(math.Ceil(orderPrice)) / ob.orderLimitRange * ob.orderLimitRange)
 	endPoint := startPoint + float64(ob.orderLimitRange)
 	searchNodePrice := (startPoint + endPoint) / 2
@@ -250,7 +260,7 @@ func (ob *OrderBook) addBuyOrder(order Order) {
 
 // addSellOrder a buy order to the order book
 func (ob *OrderBook) addSellOrder(order Order) {
-	orderPrice, _ := order.Price.Float64()
+	orderPrice := order.Price.Float64()
 	startPoint := float64(int(math.Ceil(orderPrice)) / ob.orderLimitRange * ob.orderLimitRange)
 	endPoint := startPoint + float64(ob.orderLimitRange)
 	searchNodePrice := (startPoint + endPoint) / 2
@@ -296,7 +306,7 @@ func (ob *OrderBook) removeSellNode(key float64) error {
 }
 
 func (ob *OrderBook) removeOrder(order *Order) error {
-	orderPrice, _ := order.Price.Float64()
+	orderPrice := order.Price.Float64()
 	startPoint := float64(int(math.Ceil(orderPrice)) / ob.orderLimitRange * ob.orderLimitRange)
 	endPoint := startPoint + float64(ob.orderLimitRange)
 	searchNodePrice := (startPoint + endPoint) / 2
